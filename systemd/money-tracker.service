@@ -1,0 +1,19 @@
+# NOTE: `youruser` and the /home/youruser paths are placeholders.
+# Replace them with your real Linux username and repo path before installing,
+# and set ExecStart to the absolute `node` path (`which node`) — systemd does
+# not load login shells, so nvm-managed binaries won't be on PATH.
+[Unit]
+Description=Money Tracker
+After=network.target
+
+[Service]
+Type=simple
+User=youruser
+WorkingDirectory=/home/youruser/money-tracker
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0f0f0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <title>Money Tracker</title>
+</head>
+<body>
+
+  <!-- Transactions View -->
+  <section data-view="transactions" class="active">
+    <header>Transactions</header>
+    <div class="tx-filters">
+      <select id="filter-account"><option value="">All accounts</option></select>
+      <select id="filter-type">
+        <option value="">All types</option>
+        <option value="expense">Expense</option>
+        <option value="income">Income</option>
+        <option value="transfer">Transfer</option>
+      </select>
+    </div>
+    <div class="tx-list" id="tx-list"></div>
+  </section>
+
+  <!-- Add Transaction View -->
+  <section data-view="add">
+    <header>Add Transaction</header>
+    <div class="type-selector" id="type-selector">
+      <button data-type="expense">Expense</button>
+      <button data-type="income">Income</button>
+      <button data-type="transfer">Transfer</button>
+    </div>
+    <form id="add-form">
+      <div class="form-group">
+        <label>From Account</label>
+        <select id="add-account" required></select>
+      </div>
+      <div class="form-group" id="to-account-group" style="display:none">
+        <label>To Account</label>
+        <select id="add-to-account"></select>
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="add-date" required>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="add-desc" placeholder="What was it for?" required>
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <input type="text" id="add-category" list="category-list" placeholder="Optional">
+        <datalist id="category-list"></datalist>
+      </div>
+      <div class="form-group">
+        <label>Amount</label>
+        <input type="text" id="add-amount" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0.00" required>
+      </div>
+      <button type="submit" class="btn-primary">Add Transaction</button>
+    </form>
+  </section>
+
+  <!-- Accounts View -->
+  <section data-view="accounts">
+    <header>Accounts</header>
+    <div class="add-account-row">
+      <input type="text" id="new-account-name" placeholder="New account name">
+      <select id="new-account-currency">
+        <option value="EUR">EUR</option>
+        <option value="BRL">BRL</option>
+      </select>
+      <button id="add-account-btn">Add</button>
+    </div>
+    <div class="account-list" id="account-list"></div>
+  </section>
+
+  <!-- Import View -->
+  <section data-view="import">
+    <header>Import / Export</header>
+    <div class="import-area" id="import-area">
+      <p>Tap to select a CSV file</p>
+      <p style="margin-top:8px;font-size:12px">Format: account, date, description, category, amount, type, consolidated</p>
+      <input type="file" id="import-file" accept=".csv">
+    </div>
+    <div class="import-status" id="import-status"></div>
+    <button class="btn-primary" id="import-btn" style="display:none">Import Data</button>
+    <button class="btn-primary" id="export-btn" style="background:var(--green)">Export CSV</button>
+    <button class="btn-danger" id="clear-btn">Clear All Data</button>
+  </section>
+
+  <!-- Account Edit Modal -->
+  <div class="modal-overlay" id="account-modal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">Edit Account</div>
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="edit-account-name">
+      </div>
+      <div class="form-group">
+        <label>Currency</label>
+        <select id="edit-account-currency">
+          <option value="EUR">EUR</option>
+          <option value="BRL">BRL</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-modal btn-modal-cancel" id="edit-account-cancel">Cancel</button>
+        <button class="btn-modal btn-modal-save" id="edit-account-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav>
+    <button data-nav="transactions" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      Transactions
+    </button>
+    <button data-nav="add">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+      Add
+    </button>
+    <button data-nav="accounts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+      Accounts
+    </button>
+    <button data-nav="import">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Import
+    </button>
+  </nav>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

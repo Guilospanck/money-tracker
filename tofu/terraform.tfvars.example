@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+# `bucket_name` must be globally unique across all of AWS S3.
+bucket_name = "your-money-tracker-backups"
+
+# Defaults — uncomment to override.
+# aws_region    = "eu-central-1"
+# backup_prefix = "backups"
+# iam_user_name = "money-tracker-backup"

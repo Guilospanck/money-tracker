@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Money Tracker S3 backup daily at 03:00
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+Unit=money-tracker-backup.service
+
+[Install]
+WantedBy=timers.target

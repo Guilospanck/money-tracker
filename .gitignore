@@ -1,0 +1,16 @@
+node_modules/
+.claude/
+.env
+data.sqlite
+data.sqlite-wal
+data.sqlite-shm
+transactions.csv
+backup.log
+
+# OpenTofu / Terraform — state holds the IAM secret in plaintext; never commit.
+tofu/.terraform/
+tofu/*.tfstate
+tofu/*.tfstate.*
+tofu/terraform.tfvars
+tofu/.terraformrc
+tofu/terraform.rc

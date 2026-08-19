@@ -1,0 +1,15 @@
+# NOTE: `youruser` and the /home/youruser paths are placeholders.
+# Replace them with your real Linux username and repo path before installing,
+# and set ExecStart to the absolute `node` path (`which node`) — systemd does
+# not load login shells, so nvm-managed binaries won't be on PATH.
+[Unit]
+Description=Money Tracker daily S3 backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=youruser
+WorkingDirectory=/home/youruser/money-tracker
+EnvironmentFile=/home/youruser/money-tracker/.env
+ExecStart=/usr/bin/node /home/youruser/money-tracker/backup.js
