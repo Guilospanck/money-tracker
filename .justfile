@@ -44,6 +44,63 @@ tofu-print-env:
 tofu-print-secret:
     AWS_PROFILE=money-tracker tofu -chdir=tofu output -raw aws_secret_access_key
 
+# ---- Temporary IAM user for OpenTofu (root only signs in to make/remove it) ----
+# Flow: just aws-root-login; just aws-iac-create; (tofu-plan / tofu-apply);
+#       just aws-iac-delete; just aws-root-logout. Policy: tofu/iac-policy.json.
+
+iac_user := "money-tracker-iac"
+root_profile := "root-tmp"
+
+# Sign in as the AWS root user (opens a browser) under the temporary profile root-tmp.
+aws-root-login:
+    aws login --profile {{root_profile}}
+    aws sts get-caller-identity --profile {{root_profile}}
+
+# Create the OpenTofu IAM user, give it tofu/iac-policy.json, store its key as the AWS profile "money-tracker".
+aws-iac-create:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    p={{root_profile}}
+    arn="$(aws sts get-caller-identity --profile "$p" --query Arn --output text)"
+    case "$arn" in *:root) ;; *) echo "profile $p is not root ($arn): run just aws-root-login" >&2; exit 1;; esac
+    account="$(aws sts get-caller-identity --profile "$p" --query Account --output text)"
+    pol="arn:aws:iam::$account:policy/{{iac_user}}"
+    if aws iam get-user --profile "$p" --user-name {{iac_user}} >/dev/null 2>&1 \
+        || aws iam get-policy --profile "$p" --policy-arn "$pol" >/dev/null 2>&1; then
+        echo "user {{iac_user}} or its policy already exists: run just aws-iac-delete first" >&2; exit 1
+    fi
+    aws iam create-user --profile "$p" --user-name {{iac_user}} >/dev/null
+    doc="$(mktemp)"; trap 'rm -f "$doc"' EXIT
+    sed "s/__ACCOUNT__/$account/g" tofu/iac-policy.json > "$doc"
+    aws iam create-policy --profile "$p" --policy-name {{iac_user}} --policy-document "file://$doc" >/dev/null
+    aws iam attach-user-policy --profile "$p" --user-name {{iac_user}} --policy-arn "$pol"
+    read -r id secret < <(aws iam create-access-key --profile "$p" --user-name {{iac_user}} \
+        --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text)
+    aws configure set aws_access_key_id "$id" --profile money-tracker
+    aws configure set aws_secret_access_key "$secret" --profile money-tracker
+    echo "created {{iac_user}}; its key is in profile money-tracker. IAM can take ~10 s to propagate."
+
+# Delete the OpenTofu IAM user (keys, policies, user). Needs root-tmp.
+aws-iac-delete:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    p={{root_profile}}
+    arn="$(aws sts get-caller-identity --profile "$p" --query Arn --output text)"
+    case "$arn" in *:root) ;; *) echo "profile $p is not root ($arn): run just aws-root-login" >&2; exit 1;; esac
+    for k in $(aws iam list-access-keys --profile "$p" --user-name {{iac_user}} --query 'AccessKeyMetadata[].AccessKeyId' --output text 2>/dev/null); do
+        aws iam delete-access-key --profile "$p" --user-name {{iac_user}} --access-key-id "$k"
+    done
+    account="$(aws sts get-caller-identity --profile "$p" --query Account --output text)"
+    pol="arn:aws:iam::$account:policy/{{iac_user}}"
+    aws iam detach-user-policy --profile "$p" --user-name {{iac_user}} --policy-arn "$pol" 2>/dev/null || true
+    aws iam delete-policy --profile "$p" --policy-arn "$pol" 2>/dev/null || true
+    aws iam delete-user --profile "$p" --user-name {{iac_user}}
+    echo "deleted {{iac_user}}. Profile money-tracker in ~/.aws/credentials now holds a dead key."
+
+# Sign out of the temporary root profile.
+aws-root-logout:
+    aws logout --profile {{root_profile}}
+
 # The `deploy` recipe and friends expect an SSH alias `money-tracker` in ~/.ssh/config.
 # Replace the placeholders below (<server-ip>, youruser, key path) with your own values:
 #
