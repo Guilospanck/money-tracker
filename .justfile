@@ -17,32 +17,32 @@ install:
     npm install
 
 # Initialize OpenTofu (downloads providers, writes lock file)
-tofu-init: (_require-profile "money-tracker")
-    AWS_PROFILE=money-tracker tofu -chdir=tofu init
+tofu-init:
+    tofu -chdir=tofu init
 
 # Check that all .tf files are canonically formatted
 tofu-fmt:
-    AWS_PROFILE=money-tracker tofu -chdir=tofu fmt -check -recursive
+    tofu -chdir=tofu fmt -check -recursive
 
 # Validate HCL syntax and provider schema (no AWS API calls)
-tofu-validate: (_require-profile "money-tracker")
-    AWS_PROFILE=money-tracker tofu -chdir=tofu validate
+tofu-validate:
+    tofu -chdir=tofu validate
 
 # Show the diff between desired and actual AWS state
-tofu-plan: (_require-profile "money-tracker")
-    AWS_PROFILE=money-tracker tofu -chdir=tofu plan
+tofu-plan:
+    just _with iac env AWS_PROFILE=money-tracker tofu -chdir=tofu plan
 
 # Apply the IaC (creates / updates the S3 bucket, IAM user, access key)
-tofu-apply: (_require-profile "money-tracker")
-    AWS_PROFILE=money-tracker tofu -chdir=tofu apply
+tofu-apply:
+    just _with iac env AWS_PROFILE=money-tracker tofu -chdir=tofu apply
 
 # Print the .env snippet (everything except the secret)
-tofu-print-env: (_require-profile "money-tracker")
-    AWS_PROFILE=money-tracker tofu -chdir=tofu output env_file_snippet
+tofu-print-env:
+    tofu -chdir=tofu output env_file_snippet
 
 # Print the backup user's AWS_SECRET_ACCESS_KEY (raw, no quotes)
-tofu-print-secret: (_require-profile "money-tracker")
-    AWS_PROFILE=money-tracker tofu -chdir=tofu output -raw aws_secret_access_key
+tofu-print-secret:
+    tofu -chdir=tofu output -raw aws_secret_access_key
 
 # ---- Temporary IAM user for OpenTofu (root only signs in to make/remove it) ----
 # Flow: just aws-root-login; just aws-iac-create; (tofu-plan / tofu-apply);
@@ -51,18 +51,39 @@ tofu-print-secret: (_require-profile "money-tracker")
 iac_user := "money-tracker-iac"
 root_profile := "root-tmp"
 
-# Stop early, with the fix, when the AWS profile a recipe needs does not exist.
-_require-profile profile:
+# Run a command with a temporary AWS user, and clean up after. If the profile already exists
+# (you are inside `just iac ...`), the command just runs. Otherwise: root login (browser),
+# create the user, run, then delete the user, its profile, and log out of root, even on error.
+[positional-arguments]
+_with kind *cmd:
     #!/usr/bin/env bash
-    if ! aws configure list-profiles 2>/dev/null | grep -qx '{{profile}}'; then
-        echo "AWS profile '{{profile}}' does not exist. Create it (root makes a temporary user):" >&2
-        echo "    just aws-root-login" >&2
-        echo "    just aws-iac-create" >&2
-        echo "When you are done (removes the user and the profile):" >&2
-        echo "    just aws-iac-delete" >&2
-        echo "    just aws-root-logout" >&2
-        exit 1
-    fi
+    set -uo pipefail
+    kind="$1"; shift
+    case "$kind" in
+        iac) prof=money-tracker; mk=aws-iac-create; rm=aws-iac-delete;;
+        *) echo "unknown kind $kind" >&2; exit 1;;
+    esac
+    if aws configure list-profiles 2>/dev/null | grep -qx "$prof"; then exec "$@"; fi
+    root={{root_profile}}
+    is_root() { aws sts get-caller-identity --profile "$root" --query Arn --output text 2>/dev/null | grep -q ':root$'; }
+    cleanup() {
+        trap - EXIT INT TERM
+        echo ">> cleaning up the temporary AWS user" >&2
+        just "$rm" || true
+        just aws-root-logout || true
+    }
+    is_root || just aws-root-login || exit 1
+    trap cleanup EXIT
+    trap 'exit 130' INT TERM
+    just "$mk" || exit 1
+    sleep 12
+    "$@"
+    rc=$?
+    exit $rc
+
+# Run recipes with a temporary OpenTofu AWS user, then clean up: `just iac tofu-plan tofu-apply`.
+iac +recipes:
+    just _with iac just {{recipes}}
 
 # Remove an AWS profile's sections from ~/.aws/credentials and ~/.aws/config.
 _aws-forget profile:
