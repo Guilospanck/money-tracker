@@ -51,6 +51,17 @@ tofu-print-secret:
 iac_user := "money-tracker-iac"
 root_profile := "root-tmp"
 
+# Remove an AWS profile's sections from ~/.aws/credentials and ~/.aws/config.
+_aws-forget profile:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for f in ~/.aws/credentials ~/.aws/config; do
+        [ -f "$f" ] || continue
+        t="$(mktemp)"
+        awk -v a="[{{profile}}]" -v b="[profile {{profile}}]" '/^\[/{skip=($0==a||$0==b)} !skip' "$f" > "$t"
+        cat "$t" > "$f"; rm -f "$t"
+    done
+
 # Sign in as the AWS root user (opens a browser) under the temporary profile root-tmp.
 aws-root-login:
     aws login --profile {{root_profile}}
@@ -95,11 +106,13 @@ aws-iac-delete:
     aws iam detach-user-policy --profile "$p" --user-name {{iac_user}} --policy-arn "$pol" 2>/dev/null || true
     aws iam delete-policy --profile "$p" --policy-arn "$pol" 2>/dev/null || true
     aws iam delete-user --profile "$p" --user-name {{iac_user}}
-    echo "deleted {{iac_user}}. Profile money-tracker in ~/.aws/credentials now holds a dead key."
+    just _aws-forget money-tracker
+    echo "deleted {{iac_user}} and removed profile money-tracker from ~/.aws."
 
 # Sign out of the temporary root profile.
 aws-root-logout:
     aws logout --profile {{root_profile}}
+    just _aws-forget {{root_profile}}
 
 # The `deploy` recipe and friends expect an SSH alias `money-tracker` in ~/.ssh/config.
 # Replace the placeholders below (<server-ip>, youruser, key path) with your own values:
