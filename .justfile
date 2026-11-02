@@ -17,7 +17,7 @@ install:
     npm install
 
 # Initialize OpenTofu (downloads providers, writes lock file)
-tofu-init:
+tofu-init: (_require-profile "money-tracker")
     AWS_PROFILE=money-tracker tofu -chdir=tofu init
 
 # Check that all .tf files are canonically formatted
@@ -25,23 +25,23 @@ tofu-fmt:
     AWS_PROFILE=money-tracker tofu -chdir=tofu fmt -check -recursive
 
 # Validate HCL syntax and provider schema (no AWS API calls)
-tofu-validate:
+tofu-validate: (_require-profile "money-tracker")
     AWS_PROFILE=money-tracker tofu -chdir=tofu validate
 
 # Show the diff between desired and actual AWS state
-tofu-plan:
+tofu-plan: (_require-profile "money-tracker")
     AWS_PROFILE=money-tracker tofu -chdir=tofu plan
 
 # Apply the IaC (creates / updates the S3 bucket, IAM user, access key)
-tofu-apply:
+tofu-apply: (_require-profile "money-tracker")
     AWS_PROFILE=money-tracker tofu -chdir=tofu apply
 
 # Print the .env snippet (everything except the secret)
-tofu-print-env:
+tofu-print-env: (_require-profile "money-tracker")
     AWS_PROFILE=money-tracker tofu -chdir=tofu output env_file_snippet
 
 # Print the backup user's AWS_SECRET_ACCESS_KEY (raw, no quotes)
-tofu-print-secret:
+tofu-print-secret: (_require-profile "money-tracker")
     AWS_PROFILE=money-tracker tofu -chdir=tofu output -raw aws_secret_access_key
 
 # ---- Temporary IAM user for OpenTofu (root only signs in to make/remove it) ----
@@ -50,6 +50,19 @@ tofu-print-secret:
 
 iac_user := "money-tracker-iac"
 root_profile := "root-tmp"
+
+# Stop early, with the fix, when the AWS profile a recipe needs does not exist.
+_require-profile profile:
+    #!/usr/bin/env bash
+    if ! aws configure list-profiles 2>/dev/null | grep -qx '{{profile}}'; then
+        echo "AWS profile '{{profile}}' does not exist. Create it (root makes a temporary user):" >&2
+        echo "    just aws-root-login" >&2
+        echo "    just aws-iac-create" >&2
+        echo "When you are done (removes the user and the profile):" >&2
+        echo "    just aws-iac-delete" >&2
+        echo "    just aws-root-logout" >&2
+        exit 1
+    fi
 
 # Remove an AWS profile's sections from ~/.aws/credentials and ~/.aws/config.
 _aws-forget profile:
